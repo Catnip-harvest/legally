@@ -65,6 +65,8 @@ const NEGATION_PATTERN =
   /\b(?:cannot|can't|did not|didn't|does not|doesn't|never|no|nobody|none|not|was not|wasn't|were not|weren't)\b/i;
 const UNIVERSAL_LOCATION_PATTERN =
   /(?:\b(?:all|entire)\s+(?:day|evening|night)\b.*\b(?:home|house|inside)\b|\b(?:home|house|inside)\b.*\b(?:all|entire)\s+(?:day|evening|night)\b)/i;
+const STAYED_LOCATION_PATTERN =
+  /\b(?:home|house|inside)\b.{0,100}\b(?:did not|didn't|never)\s+(?:leave|go out|step out)\b/i;
 const DEPARTURE_PATTERN =
   /\b(?:drove away|leave|left|stepped out|went out|went to (?:get|buy|pick up))\b/i;
 const KNOWLEDGE_DENIAL_PATTERN =
@@ -209,7 +211,9 @@ function polarityOpposite(pair: CandidatePair) {
   const { text: textB } = pair.claimB;
   const locationOpposition =
     (UNIVERSAL_LOCATION_PATTERN.test(textA) && DEPARTURE_PATTERN.test(textB)) ||
-    (UNIVERSAL_LOCATION_PATTERN.test(textB) && DEPARTURE_PATTERN.test(textA));
+    (UNIVERSAL_LOCATION_PATTERN.test(textB) && DEPARTURE_PATTERN.test(textA)) ||
+    (STAYED_LOCATION_PATTERN.test(textA) && DEPARTURE_PATTERN.test(textB)) ||
+    (STAYED_LOCATION_PATTERN.test(textB) && DEPARTURE_PATTERN.test(textA));
   const knowledgeOpposition =
     (KNOWLEDGE_DENIAL_PATTERN.test(textA) && KNOWLEDGE_AFFIRMATION_PATTERN.test(textB)) ||
     (KNOWLEDGE_DENIAL_PATTERN.test(textB) && KNOWLEDGE_AFFIRMATION_PATTERN.test(textA));

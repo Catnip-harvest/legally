@@ -12,8 +12,62 @@ import {
   type ScoredContradiction,
 } from "./scoring-engine";
 
-function normalizeWhitespace(value: string) {
-  return value.replace(/[“”]/g, '"').replace(/[’]/g, "'").replace(/\s+/g, " ").trim();
+function normalizeForEvidenceMatch(value: string) {
+  return value
+    .replace(/[\u201c\u201d]/g, '"')
+    .replace(/[\u2018\u2019]/g, "'")
+    .replace(/[\u2013\u2014]/g, "-")
+    .replace(/\s+/g, " ")
+    .trim()
+    .toLowerCase()
+    .replace(/[.,;:!?]+$/g, "");
+}
+
+type TranscriptLine = {
+  text: string;
+  sourceLine: number;
+  kind: "QUESTION" | "ANSWER" | "CONTINUATION" | "PLAIN" | "BLANK";
+};
+
+function parseTranscriptLine(rawLine: string, physicalLine: number): TranscriptLine {
+  const numbered = rawLine.match(/^\s*Line\s+(\d+)\s*(?:(Q|A):\s*)?(.*)$/i);
+  if (numbered) {
+    return {
+      text: numbered[3].trim(),
+      sourceLine: Number(numbered[1]),
+      kind:
+        numbered[2]?.toUpperCase() === "Q"
+          ? "QUESTION"
+          : numbered[2]?.toUpperCase() === "A"
+            ? "ANSWER"
+            : "CONTINUATION",
+    };
+  }
+
+  const speaker = rawLine.match(/^\s*(Q|A):\s*(.*)$/i);
+  if (speaker) {
+    return {
+      text: speaker[2].trim(),
+      sourceLine: physicalLine,
+      kind: speaker[1].toUpperCase() === "Q" ? "QUESTION" : "ANSWER",
+    };
+  }
+
+  const text = rawLine.trim();
+  return {
+    text,
+    sourceLine: physicalLine,
+    kind: text ? "PLAIN" : "BLANK",
+  };
+}
+
+function normalizedMatch(candidate: string, quote: string) {
+  const normalizedCandidate = normalizeForEvidenceMatch(candidate);
+  const normalizedQuote = normalizeForEvidenceMatch(quote);
+  return (
+    normalizedCandidate === normalizedQuote ||
+    (normalizedQuote.length >= 24 && normalizedCandidate.includes(normalizedQuote))
+  );
 }
 
 export function locateQuote(transcript: string, quote: string): EvidenceReference {
@@ -21,23 +75,40 @@ export function locateQuote(transcript: string, quote: string): EvidenceReferenc
   const exactIndex = transcript.indexOf(trimmedQuote);
 
   if (exactIndex >= 0) {
+    const physicalLine = transcript.slice(0, exactIndex).split("\n").length;
+    const rawLine = transcript.split(/\r?\n/)[physicalLine - 1] ?? "";
     return {
       quote: trimmedQuote,
-      line: transcript.slice(0, exactIndex).split("\n").length,
+      line: parseTranscriptLine(rawLine, physicalLine).sourceLine,
       verified: true,
     };
   }
 
-  const normalizedQuote = normalizeWhitespace(trimmedQuote);
-  const lines = transcript.split("\n");
+  const lines = transcript
+    .split(/\r?\n/)
+    .map((line, index) => parseTranscriptLine(line, index + 1));
 
   for (let index = 0; index < lines.length; index += 1) {
-    const normalizedLine = normalizeWhitespace(lines[index]);
-    if (
-      normalizedLine === normalizedQuote ||
-      (normalizedQuote.length >= 24 && normalizedLine.includes(normalizedQuote))
+    const line = lines[index];
+    if (line.kind === "BLANK" || line.kind === "QUESTION") continue;
+
+    let combined = line.text;
+    if (normalizedMatch(combined, trimmedQuote)) {
+      return { quote: trimmedQuote, line: line.sourceLine, verified: true };
+    }
+
+    if (line.kind !== "ANSWER" && line.kind !== "CONTINUATION") continue;
+    for (
+      let continuationIndex = index + 1;
+      continuationIndex < lines.length;
+      continuationIndex += 1
     ) {
-      return { quote: lines[index].trim(), line: index + 1, verified: true };
+      const continuation = lines[continuationIndex];
+      if (continuation.kind !== "CONTINUATION") break;
+      combined = `${combined} ${continuation.text}`;
+      if (normalizedMatch(combined, trimmedQuote)) {
+        return { quote: trimmedQuote, line: line.sourceLine, verified: true };
+      }
     }
   }
 

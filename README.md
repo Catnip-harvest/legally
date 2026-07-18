@@ -44,7 +44,7 @@ The feature-extraction pipeline is a module-level lazy singleton, pre-warmed whe
 - Exact source quotation verification with one-based line references.
 - Input limits, provider timeouts, safe errors, and `no-store` responses.
 - Responsive desktop and mobile layouts.
-- 21 automated tests, including real MiniLM fixture integration.
+- 25 automated tests, including real MiniLM and wrapped-line benchmark regressions.
 
 ## Run locally
 

@@ -71,6 +71,27 @@ describe("scoreContradiction", () => {
     expect(result.type).toBe("DIRECT");
   });
 
+  it("keeps hedged timing separate from a direct leave-versus-stay conflict", async () => {
+    const input = pair({
+      topic: "Presence at home",
+      claimA: {
+        text: "I was already home by then. I'd gotten in around 8:30 or so and didn't leave again that night.",
+        timeRef: "around 8:30 or so",
+        entities: ["Marcus Whitfield", "home"],
+      },
+      claimB: {
+        text: "I want to say I left the house again sometime close to 9, maybe a little after, to grab something from the store.",
+        timeRef: "sometime close to 9, maybe a little after",
+        entities: ["Marcus Whitfield", "house", "store"],
+      },
+    });
+
+    const result = await scoreContradiction(input);
+    expect(result.features.hedgeLanguageDetected).toBe(true);
+    expect(result.features.polarityOpposite).toBe(true);
+    expect(result.type).toBe("DIRECT");
+  });
+
   it("classifies a small hedged time difference as a false positive", async () => {
     const input = pair({
       topic: "Arrival time",
@@ -92,6 +113,26 @@ describe("scoreContradiction", () => {
     expect(result.type).toBe("FALSE_POSITIVE");
     expect(result.features.timeDeltaMinutes).toBe(5);
     expect(result.features.hedgeLanguageDetected).toBe(true);
+  });
+
+  it("treats the Ilić five-minute calendar correction as a false positive", async () => {
+    const input = pair({
+      topic: "Vendor meeting start time",
+      claimA: {
+        text: "It started at 8:00, I remember because I'd just gotten coffee.",
+        timeRef: "8:00",
+        entities: ["Renata Ilić", "vendor meeting"],
+      },
+      claimB: {
+        text: "It was 8:05, not 8:00 like I may have said before.",
+        timeRef: "8:05",
+        entities: ["Renata Ilić", "vendor meeting"],
+      },
+    });
+
+    const result = await scoreContradiction(input);
+    expect(result.features.timeDeltaMinutes).toBe(5);
+    expect(result.type).toBe("FALSE_POSITIVE");
   });
 
   it("classifies a large non-polar timeline conflict as inferential", async () => {

@@ -47,7 +47,7 @@ pnpm lint
 pnpm build
 ```
 
-> The 21-test suite includes a real local-MiniLM integration fixture for all three classes. Their expected classifications did not change. Compared with feature hashing, MiniLM recognizes the semantic relationship in the sleep timeline much more strongly, while the policy signals still determine the legal-review bucket.
+> The 25-test suite includes real local-MiniLM fixtures for all three classes plus wrapped certified-line benchmark regressions. Their expected classifications did not change. Compared with feature hashing, MiniLM recognizes the semantic relationship in the sleep timeline much more strongly, while the policy signals still determine the legal-review bucket.
 
 Show the measured fixture values from the submission notes.
 
