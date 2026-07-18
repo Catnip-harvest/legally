@@ -19,25 +19,15 @@ export const analysisRequestSchema = z
   })
   .strict();
 
-export const candidateRelationSchema = z.enum([
-  "explicit_negation",
-  "exclusive_values",
-  "jointly_impossible",
-  "timeline_conflict",
-  "compatible",
-  "scope_mismatch",
-  "insufficient_context",
-]);
-
 export const modelCandidateSchema = z
   .object({
     topic: z.string().trim().min(1).max(160),
     quoteA: z.string().trim().min(1).max(1_500),
     quoteB: z.string().trim().min(1).max(1_500),
-    relation: candidateRelationSchema,
-    sameSubject: z.boolean(),
-    sameEvent: z.boolean(),
-    sameScope: z.boolean(),
+    timeRefA: z.string().trim().min(1).max(100).nullable(),
+    timeRefB: z.string().trim().min(1).max(100).nullable(),
+    entitiesA: z.array(z.string().trim().min(1).max(120)).min(1).max(12),
+    entitiesB: z.array(z.string().trim().min(1).max(120)).min(1).max(12),
     reconciliation: z.string().trim().max(600).nullable(),
     explanation: z.string().trim().min(1).max(900),
   })
@@ -64,10 +54,10 @@ export const modelResponseJsonSchema = {
           "topic",
           "quoteA",
           "quoteB",
-          "relation",
-          "sameSubject",
-          "sameEvent",
-          "sameScope",
+          "timeRefA",
+          "timeRefB",
+          "entitiesA",
+          "entitiesB",
           "reconciliation",
           "explanation",
         ],
@@ -84,14 +74,24 @@ export const modelResponseJsonSchema = {
             type: "string",
             description: "A verbatim quotation copied from transcript B.",
           },
-          relation: {
-            type: "string",
-            enum: candidateRelationSchema.options,
-            description: "The narrow semantic relationship between the quotations.",
+          timeRefA: {
+            type: ["string", "null"],
+            description: "The shortest time phrase in quote A, or null.",
           },
-          sameSubject: { type: "boolean" },
-          sameEvent: { type: "boolean" },
-          sameScope: { type: "boolean" },
+          timeRefB: {
+            type: ["string", "null"],
+            description: "The shortest time phrase in quote B, or null.",
+          },
+          entitiesA: {
+            type: "array",
+            items: { type: "string" },
+            description: "Canonical people, objects, locations, and events in quote A.",
+          },
+          entitiesB: {
+            type: "array",
+            items: { type: "string" },
+            description: "Canonical people, objects, locations, and events in quote B.",
+          },
           reconciliation: {
             type: ["string", "null"],
             description:
@@ -108,7 +108,6 @@ export const modelResponseJsonSchema = {
 } as const;
 
 export type AnalysisRequest = z.infer<typeof analysisRequestSchema>;
-export type CandidateRelation = z.infer<typeof candidateRelationSchema>;
 export type ModelCandidate = z.infer<typeof modelCandidateSchema>;
 
 export type Classification = "DIRECT" | "INFERENTIAL" | "FALSE_POSITIVE";

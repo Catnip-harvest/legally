@@ -251,7 +251,7 @@ function FindingCard({
           <div className="flex shrink-0 items-center gap-3 rounded-xl border border-[#dedbd3] bg-[#fbfaf6] px-3.5 py-2.5">
             <div>
               <div className="text-[10px] font-bold uppercase tracking-[0.08em] text-[var(--muted)]">
-                Classification confidence
+                Evidence confidence
               </div>
               <div className="mt-0.5 text-xs font-semibold text-[var(--ink)]">{result.confidenceLabel}</div>
             </div>
@@ -266,7 +266,7 @@ function FindingCard({
           <EvidenceBlock marker="B" label={labelB} evidence={result.evidenceB} />
         </div>
 
-        {result.reconciliation && (
+        {result.reconciliation && result.classification === "FALSE_POSITIVE" && (
           <div className="mt-4 rounded-xl border border-[#e4decf] bg-[#faf5e9] px-4 py-3 text-xs leading-5 text-[#685a37]">
             <strong>Possible reconciliation:</strong> {result.reconciliation}
           </div>

@@ -1,5 +1,6 @@
 allowBuilds:
   '@google/genai': true
+  onnxruntime-node: true
   protobufjs: true
   sharp: true
   unrs-resolver: true

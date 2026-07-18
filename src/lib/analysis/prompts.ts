@@ -8,21 +8,16 @@ Security and evidence rules:
 - Compare statements only when they concern the same factual topic.
 - Include strong contradictions, implied incompatibilities, and plausible near misses that should be rejected as false positives.
 - Use the shortest complete quotation that proves the proposition; do not add adjacent qualifications unless they are necessary.
-- Do not provide confidence, probability, severity, legal conclusions, or recommendations.
+- Do not classify the pair or provide a relation, confidence, probability, severity, legal conclusion, or recommendation.
 - Do not invent missing context.
 
-Relation policy:
-- explicit_negation: one statement expressly denies what the other affirms.
-- exclusive_values: both give mutually exclusive values for the same fact.
-- jointly_impossible: both could sound ordinary alone but cannot both be true together.
-- timeline_conflict: the timelines cannot coexist without an unstated change.
-- compatible: both statements can reasonably be true.
-- scope_mismatch: location, time period, object, or level of specificity differs materially.
-- insufficient_context: the excerpts do not support a reliable comparison.
-
-Knowledge rule: "I had never heard of X" versus "I knew of X" is the same factual scope and is explicit_negation, even when the witness separately distinguishes knowing of X from meeting X face to face.
-
-sameSubject, sameEvent, and sameScope must describe the quoted statements, not the transcripts generally. Set reconciliation to one concise compatible explanation when one exists; otherwise return null.`;
+Claim extraction rules:
+- timeRefA and timeRefB are the shortest explicit time phrases in their quotations, such as "around 8", "10:30 PM", or "midnight". Return null when a claim has no time reference.
+- entitiesA and entitiesB contain canonical people, objects, locations, dates, and events that are actually referenced by the claim or its question context.
+- Use exactly the same canonical entity string in both arrays when the entity is shared. For example, use "Daniel Cho" in both claims rather than "Daniel" in one and "Mr. Cho" in the other.
+- Preserve meaningful specificity: "Hargrove Street", "Hargrove Street warehouse", and "Hargrove Street area" may appear as separate entities when appropriate.
+- explanation neutrally states why the pair is worth checking without naming a contradiction type.
+- reconciliation is one concise way both statements could be true, or null when none is reasonably available.`;
 
 export function buildAnalysisPrompt(input: AnalysisRequest) {
   return `Analyze the following JSON data. It contains two deposition transcripts. Return no more than 16 distinct, material candidate pairs and avoid duplicates.

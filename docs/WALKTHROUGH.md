@@ -1,48 +1,44 @@
 # Legally walkthrough script
 
-Target length: 6–8 minutes. Record the browser and editor side by side or switch between them. Raw narration is fine.
+Target length: 6–8 minutes. Raw screen recording and narration are enough.
 
 ## 0:00–0:40 — Problem and outcome
 
-> This is Legally, a deposition contradiction review tool. The original prototype sent two hard-coded transcripts directly from the browser and treated every apparent inconsistency the same. I rebuilt it around the legal distinction between direct contradictions, inferential contradictions, and false positives. The central constraint is that the language model never supplies the confidence score.
+> This is Legally, a deposition contradiction reviewer. It separates direct contradictions, inferential contradictions, and false positives. The central constraint is that Gemini never supplies the confidence score or final classification.
 
 Show the landing page and the three-type primer.
 
 ## 0:40–1:30 — Input and user experience
 
-> A reviewer can paste or import two plain-text depositions, rename each source, and run a comparison. The included Marcus Webb fixture is synthetic. The browser sends the transcripts to a server route only when Analyze is clicked, and the application does not persist them.
+> A reviewer can paste or import two plain-text depositions and run a comparison. The included testimony is synthetic. The browser sends it to a server route only when Analyze is clicked, and the application does not persist it.
 
-Scroll through both transcript panels, then click **Analyze testimony**.
+Click **Analyze testimony**.
 
-## 1:30–2:45 — Architecture
+## 1:30–2:35 — Extraction boundary
 
 Open `src/app/api/analyze/route.ts`, `src/lib/analysis/gemini.ts`, and `src/lib/analysis/schema.ts`.
 
-> The API key stays server-side. The request is size-limited and validated with Zod. Gemini is used as an evidence extractor: it returns verbatim quote pairs, a constrained semantic relation, alignment flags, a possible reconciliation, and an explanation. Its JSON schema does not contain confidence, severity, review priority, or a final display type. Responses are schema-validated again before they reach application logic.
+> The Gemini key stays server-side. Gemini proposes exact quote pairs, time references, entities, a possible reconciliation, and an explanation. Its response schema has no confidence, severity, priority, or classification fields. Zod validates that boundary, then the application verifies both quotations against the supplied transcripts.
 
-Point out `responseMimeType`, `responseJsonSchema`, and the absence of a confidence field.
+## 2:35–4:15 — MiniLM and deterministic scoring
 
-## 2:45–4:15 — Deterministic classification and confidence
+Open `src/lib/analysis/embeddings.ts` and `src/lib/analysis/scoring-engine.ts`.
 
-Open `src/lib/analysis/confidence.ts`.
+> Semantic similarity now comes from all-MiniLM-L6-v2 running locally through Transformers.js and ONNX. The roughly 90-megabyte model downloads once, is pre-warmed at server startup, and is reused through a module singleton. A SHA-256 keyed memory cache prevents duplicate claim embeddings.
 
-> The deterministic layer first verifies that both quotations actually appear in the source and derives their line numbers. Unverifiable evidence is excluded. The policy maps explicit negation and exclusive values to direct, aligned impossible facts to inferential, and compatibility or scope mismatch to false positive. There are local overrides for important cases: “all evening” versus leaving is direct, and “around 8” versus 8:05 falls inside a 15-minute human-imprecision tolerance.
+> The scoring engine is async because embedding is async, but classification remains a deterministic decision tree. Entity overlap gates unrelated claims. Hedged time differences inside 15 minutes become false positives. Opposite polarity plus similarity becomes direct. Incompatible times without direct polarity become inferential. Weak signals default to false positive.
 
-> Confidence is a sum of named, code-owned factors: quote integrity, alignment, relation strength, local textual support, plus hedge and reconciliation penalties. The score is clamped to 0–99 and every factor is visible in the UI. It is classification confidence, not legal materiality or witness credibility.
+> Confidence is the same code-owned weighted sum as before. The MiniLM change did not alter any weight or threshold, and no LLM confidence is read anywhere.
 
-Expand **How this score was calculated** on one result.
+Expand **How this score was calculated** on a result.
 
-## 4:15–5:35 — Results
+## 4:15–5:20 — Results
 
-Show and filter the live results.
+Filter the live results by Direct, Inferential, and False positive. Show verified quotations, source lines, reconciliation where relevant, and the evidence-confidence factors.
 
-> The demonstration identifies the Daniel Cho denial, leaving home, and the changed sleep time as direct contradictions. It suppresses three near misses: driving through an area is not visiting a warehouse; being alone does not rule out a brief wave to a neighbor; and ordering pizza does not exclude buying groceries. Each card includes verified evidence, source lines, a possible reconciliation when one exists, review priority, and the deterministic score.
+## 5:20–6:25 — Tests and measured similarity
 
-Click the Direct and False positives filters and show the confidence details.
-
-## 5:35–6:20 — Testing and challenges
-
-Open `src/lib/analysis/confidence.test.ts` and run:
+Open `src/lib/analysis/scoring-engine.test.ts` and run:
 
 ```bash
 pnpm test
@@ -51,10 +47,12 @@ pnpm lint
 pnpm build
 ```
 
-> The main challenge was separating semantic extraction from adjudication. Models are useful for proposing evidence, but letting them emit a probability would make the score opaque and unstable. The tests therefore target policy behavior independently of Gemini and prove identical evidence produces identical scores.
+> The 21-test suite includes a real local-MiniLM integration fixture for all three classes. Their expected classifications did not change. Compared with feature hashing, MiniLM recognizes the semantic relationship in the sleep timeline much more strongly, while the policy signals still determine the legal-review bucket.
 
-## 6:20–7:10 — Caveats and next steps
+Show the measured fixture values from the submission notes.
 
-> This is production-minded for a take-home, but it is not ready for confidential legal matters. Real deployment needs attorney-labeled evaluations, authentication and tenant isolation, certified page and line mapping, retention controls, rate limiting, audit logs, and a provider agreement appropriate for confidential data. PDF and OCR ingestion are also deliberately outside this four-to-five-hour scope.
+## 6:25–7:10 — Caveats
+
+> This is production-minded for a take-home, but not ready for confidential legal matters. It still needs attorney-labeled calibration, authentication, tenant isolation, certified page and line mapping, retention controls, rate limiting, audits, and a suitable provider agreement. The similarity threshold was deliberately not retuned in this narrow embedding swap; labeled evaluation should drive that later.
 
 End on the results screen.

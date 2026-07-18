@@ -23,7 +23,7 @@ export async function POST(request: Request) {
   try {
     const input = analysisRequestSchema.parse(await request.json());
     const extraction = await extractCandidatesWithGemini(input);
-    const payload = buildAnalysisPayload(
+    const payload = await buildAnalysisPayload(
       extraction.candidates,
       input.transcriptA,
       input.transcriptB,
@@ -43,6 +43,10 @@ export async function POST(request: Request) {
     }
 
     const message = error instanceof Error ? error.message : "UNKNOWN_ERROR";
+    console.error("[analysis-provider-error]", {
+      name: error instanceof Error ? error.name : "UnknownError",
+      message: message.slice(0, 500),
+    });
     if (message === "GEMINI_API_KEY_MISSING") {
       return errorResponse(503, "SERVICE_NOT_CONFIGURED", "Analysis is not configured.");
     }
