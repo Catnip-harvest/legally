@@ -71,6 +71,47 @@ describe("scoreContradiction", () => {
     expect(result.type).toBe("DIRECT");
   });
 
+  it("detects signed-off versus never-signed as opposite polarity", async () => {
+    const input = pair({
+      topic: "Change order approval",
+      claimA: {
+        text: "My supervisor approved it. He signed off on it himself before we proceeded with the work.",
+        timeRef: null,
+        entities: ["Priya Nair", "Daniel Cho", "change order"],
+      },
+      claimB: {
+        text: "Honestly, Danny never signed anything on that one. I submitted it myself and it went through without his sign-off.",
+        timeRef: null,
+        entities: ["Priya Nair", "Daniel Cho", "change order"],
+      },
+    });
+
+    const result = await scoreContradiction(input);
+    expect(result.features.polarityOpposite).toBe(true);
+    expect(result.type).toBe("DIRECT");
+    expect(result.confidence).toBe(65);
+  });
+
+  it("does not treat inspections on different dates as opposite polarity", async () => {
+    const input = pair({
+      topic: "Loading dock inspection",
+      claimA: {
+        text: "No. I did not inspect it that day.",
+        timeRef: "October 3rd",
+        entities: ["Owen Faraday", "loading dock", "October 3rd"],
+      },
+      claimB: {
+        text: "Yes, I inspected it. I want to say it was maybe October 2nd or so.",
+        timeRef: "October 2nd or so",
+        entities: ["Owen Faraday", "loading dock", "October 2nd"],
+      },
+    });
+
+    const result = await scoreContradiction(input);
+    expect(result.features.polarityOpposite).toBe(false);
+    expect(result.type).toBe("FALSE_POSITIVE");
+  });
+
   it("keeps hedged timing separate from a direct leave-versus-stay conflict", async () => {
     const input = pair({
       topic: "Presence at home",

@@ -62,7 +62,7 @@ const FIXED_TIME_REFERENCE = new Date(2000, 0, 1, 12, 0, 0, 0);
 const HEDGE_PATTERN =
   /(?:\b(?:about|approximately|around|maybe|or so|roughly)\b|\b\w+-ish\b)/i;
 const NEGATION_PATTERN =
-  /\b(?:cannot|can't|did not|didn't|does not|doesn't|never|no|nobody|none|not|was not|wasn't|were not|weren't)\b/i;
+  /\b(?:cannot|can't|did not|didn't|does not|doesn't|never|no|no one|nobody|none|nothing|not|was not|wasn't|were not|weren't|without)\b/i;
 const UNIVERSAL_LOCATION_PATTERN =
   /(?:\b(?:all|entire)\s+(?:day|evening|night)\b.*\b(?:home|house|inside)\b|\b(?:home|house|inside)\b.*\b(?:all|entire)\s+(?:day|evening|night)\b)/i;
 const STAYED_LOCATION_PATTERN =
@@ -138,6 +138,42 @@ const TOKEN_CANONICALIZATION: Record<string, string> = {
   went: "location",
 };
 
+const PREDICATE_CANONICALIZATION: Record<string, string> = {
+  approval: "approve",
+  approve: "approve",
+  approved: "approve",
+  approves: "approve",
+  approving: "approve",
+  inspect: "inspect",
+  inspected: "inspect",
+  inspecting: "inspect",
+  inspection: "inspect",
+  inspections: "inspect",
+  sign: "sign",
+  "sign-off": "sign",
+  signed: "sign",
+  "signed-off": "sign",
+  signing: "sign",
+  signs: "sign",
+  signature: "sign",
+  signatures: "sign",
+};
+
+const MONTH_NUMBER: Record<string, number> = {
+  january: 1,
+  february: 2,
+  march: 3,
+  april: 4,
+  may: 5,
+  june: 6,
+  july: 7,
+  august: 8,
+  september: 9,
+  october: 10,
+  november: 11,
+  december: 12,
+};
+
 function clamp(value: number, minimum = 0, maximum = 1) {
   return Math.min(maximum, Math.max(minimum, value));
 }
@@ -146,6 +182,37 @@ function tokenize(text: string) {
   return (text.toLowerCase().match(/[a-z0-9]+(?:-[a-z0-9]+)?/g) ?? [])
     .map((token) => TOKEN_CANONICALIZATION[token] ?? token)
     .filter((token) => token.length > 1 && !STOP_WORDS.has(token));
+}
+
+function sharedPredicate(textA: string, textB: string) {
+  const predicateRoots = (text: string) =>
+    new Set(
+      (text.toLowerCase().match(/[a-z0-9]+(?:-[a-z0-9]+)?/g) ?? [])
+        .map((token) => PREDICATE_CANONICALIZATION[token])
+        .filter((token): token is string => Boolean(token)),
+    );
+  const rootsA = predicateRoots(textA);
+  const rootsB = predicateRoots(textB);
+  return [...rootsA].some((root) => rootsB.has(root));
+}
+
+function calendarDateScopes(claim: CandidateClaim) {
+  const value = `${claim.text} ${claim.timeRef ?? ""} ${claim.entities.join(" ")}`;
+  const scopes = new Set<string>();
+  const pattern =
+    /\b(january|february|march|april|may|june|july|august|september|october|november|december)\s+(\d{1,2})(?:st|nd|rd|th)?\b/gi;
+  let match: RegExpExecArray | null;
+  while ((match = pattern.exec(value)) !== null) {
+    scopes.add(`${MONTH_NUMBER[match[1].toLowerCase()]}-${Number(match[2])}`);
+  }
+  return scopes;
+}
+
+function hasDistinctCalendarDateScopes(pair: CandidatePair) {
+  const scopesA = calendarDateScopes(pair.claimA);
+  const scopesB = calendarDateScopes(pair.claimB);
+  if (!scopesA.size || !scopesB.size) return false;
+  return ![...scopesA].some((scope) => scopesB.has(scope));
 }
 
 function normalizeEntity(entity: string) {
@@ -209,6 +276,7 @@ function tokenOverlap(textA: string, textB: string) {
 function polarityOpposite(pair: CandidatePair) {
   const { text: textA } = pair.claimA;
   const { text: textB } = pair.claimB;
+  if (hasDistinctCalendarDateScopes(pair)) return false;
   const locationOpposition =
     (UNIVERSAL_LOCATION_PATTERN.test(textA) && DEPARTURE_PATTERN.test(textB)) ||
     (UNIVERSAL_LOCATION_PATTERN.test(textB) && DEPARTURE_PATTERN.test(textA)) ||
@@ -220,7 +288,10 @@ function polarityOpposite(pair: CandidatePair) {
   if (locationOpposition || knowledgeOpposition) return true;
 
   const negationDiffers = NEGATION_PATTERN.test(textA) !== NEGATION_PATTERN.test(textB);
-  return negationDiffers && tokenOverlap(textA, textB) >= 0.18;
+  return (
+    negationDiffers &&
+    (sharedPredicate(textA, textB) || tokenOverlap(textA, textB) >= 0.18)
+  );
 }
 
 export async function extractScoringFeatures(

@@ -21,7 +21,7 @@ The extraction prompt/schema, Gemini integration, and UI were not changed as par
 
 ## Verification completed
 
-- `pnpm test`: **25/25 passed**
+- `pnpm test`: **27/27 passed**
 - `pnpm typecheck`: passed
 - `pnpm lint`: passed
 - `pnpm build`: passed with Next.js 16.2.10
