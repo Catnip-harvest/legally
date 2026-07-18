@@ -60,7 +60,7 @@ Set the following in `.env.local`:
 
 ```dotenv
 GEMINI_API_KEY=your_google_ai_studio_key
-GEMINI_MODEL=gemini-3.5-flash
+GEMINI_MODEL=gemini-3-flash-preview
 ```
 
 Open [http://localhost:3000](http://localhost:3000). The sample testimony is loaded by default. The server startup log confirms when MiniLM is ready.

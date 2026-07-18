@@ -113,7 +113,7 @@ describe("verified evidence adapter", () => {
       [input],
       transcriptA,
       transcriptB,
-      "gemini-3.5-flash",
+      "gemini-3-flash-preview",
     );
 
     expect(payload.summary).toMatchObject({ direct: 1, rejectedCandidates: 0 });
