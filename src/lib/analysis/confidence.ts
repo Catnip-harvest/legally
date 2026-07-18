@@ -53,12 +53,51 @@ function parseTranscriptLine(rawLine: string, physicalLine: number): TranscriptL
     };
   }
 
+  const depositionSpeaker = rawLine.match(
+    /^\s*((?:(?:THE\s+)?(?:WITNESS|DEPONENT|COURT|COURT\s+REPORTER|EXAMINER))|(?:(?:MR|MRS|MS|DR)\.\s+[A-Z][A-Z'’-]*(?:\s+[A-Z][A-Z'’-]*)*)):\s*(.*)$/i,
+  );
+  if (depositionSpeaker) {
+    const label = depositionSpeaker[1].toUpperCase();
+    const isWitness = /\b(?:WITNESS|DEPONENT)\b/.test(label);
+    return {
+      text: depositionSpeaker[2].trim(),
+      sourceLine: physicalLine,
+      kind: isWitness ? "ANSWER" : "QUESTION",
+    };
+  }
+
   const text = rawLine.trim();
   return {
     text,
     sourceLine: physicalLine,
     kind: text ? "PLAIN" : "BLANK",
   };
+}
+
+function parseTranscriptLines(transcript: string) {
+  let activeSpeaker: "QUESTION" | "ANSWER" | null = null;
+
+  return transcript.split(/\r?\n/).map((rawLine, index) => {
+    const parsed = parseTranscriptLine(rawLine, index + 1);
+    if (parsed.kind === "BLANK") {
+      activeSpeaker = null;
+      return parsed;
+    }
+    if (parsed.kind === "QUESTION" || parsed.kind === "ANSWER") {
+      activeSpeaker = parsed.kind;
+      return parsed;
+    }
+    if (parsed.kind === "CONTINUATION") {
+      return activeSpeaker === "QUESTION" ? { ...parsed, kind: "QUESTION" as const } : parsed;
+    }
+    if (activeSpeaker === "ANSWER") {
+      return { ...parsed, kind: "CONTINUATION" as const };
+    }
+    if (activeSpeaker === "QUESTION") {
+      return { ...parsed, kind: "QUESTION" as const };
+    }
+    return parsed;
+  });
 }
 
 function normalizedMatch(candidate: string, quote: string) {
@@ -84,9 +123,7 @@ export function locateQuote(transcript: string, quote: string): EvidenceReferenc
     };
   }
 
-  const lines = transcript
-    .split(/\r?\n/)
-    .map((line, index) => parseTranscriptLine(line, index + 1));
+  const lines = parseTranscriptLines(transcript);
 
   for (let index = 0; index < lines.length; index += 1) {
     const line = lines[index];

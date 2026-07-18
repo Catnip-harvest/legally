@@ -86,6 +86,43 @@ describe("verified evidence adapter", () => {
     });
   });
 
+  it("verifies wrapped THE WITNESS blocks without certified line numbers", () => {
+    const transcript = [
+      "MR. HUGHES: Did you personally speak with the driver, Mr. Castellanos,",
+      "at any point that evening?",
+      "",
+      "THE WITNESS: I did not speak with him that night. I was in the office",
+      "the entire shift and never had a face-to-face conversation with him",
+      "that evening.",
+      "",
+      "MR. HUGHES: So you did see him that night?",
+      "",
+      "THE WITNESS: I mean, I guess technically I saw him in passing near the",
+      "truck. We didn't really talk, it was just a quick check-in.",
+    ].join("\n");
+    const denial =
+      "I did not speak with him that night. I was in the office the entire shift and never had a face-to-face conversation with him that evening.";
+    const admission =
+      "I mean, I guess technically I saw him in passing near the truck. We didn't really talk, it was just a quick check-in.";
+
+    expect(locateQuote(transcript, denial)).toEqual({
+      quote: denial,
+      line: 4,
+      verified: true,
+    });
+    expect(locateQuote(transcript, admission)).toEqual({
+      quote: admission,
+      line: 10,
+      verified: true,
+    });
+    expect(
+      locateQuote(
+        transcript,
+        "never had a face-to-face conversation with him that evening",
+      ),
+    ).toMatchObject({ line: 4, verified: true });
+  });
+
   it("keeps the wrapped Whitfield benchmark candidate in the review payload", async () => {
     const transcriptA = [
       "Line 112  Q: Where were you around the time of the incident, roughly 9pm?",
