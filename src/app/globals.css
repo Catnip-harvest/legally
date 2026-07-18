@@ -1,0 +1,93 @@
+@import "tailwindcss";
+
+:root {
+  --paper: #f4f2ec;
+  --paper-deep: #e9e5dc;
+  --surface: #fffefa;
+  --ink: #17221d;
+  --muted: #637068;
+  --line: #d8d5cc;
+  --evergreen: #173f32;
+  --evergreen-light: #e7f0eb;
+  --red: #a43b32;
+  --red-light: #f7e9e6;
+  --amber: #9a671f;
+  --amber-light: #f7efdd;
+  --slate: #55635c;
+  --slate-light: #ebeeec;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html {
+  background: var(--paper);
+  scroll-behavior: smooth;
+}
+
+body {
+  min-height: 100vh;
+  margin: 0;
+  background:
+    radial-gradient(circle at 12% -8%, rgba(255, 255, 255, 0.95), transparent 28rem),
+    var(--paper);
+  color: var(--ink);
+  font-family: Arial, Helvetica, sans-serif;
+}
+
+button,
+input,
+textarea {
+  font: inherit;
+}
+
+button,
+label[role="button"] {
+  -webkit-tap-highlight-color: transparent;
+}
+
+::selection {
+  background: #c9ded3;
+  color: #0e2d23;
+}
+
+.display-font {
+  font-family: Georgia, "Times New Roman", serif;
+  font-weight: 500;
+  letter-spacing: -0.035em;
+}
+
+.paper-grid {
+  background-image:
+    linear-gradient(rgba(23, 63, 50, 0.035) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(23, 63, 50, 0.035) 1px, transparent 1px);
+  background-size: 32px 32px;
+}
+
+.focus-ring:focus-visible {
+  outline: 3px solid rgba(23, 63, 50, 0.25);
+  outline-offset: 2px;
+}
+
+.transcript-scrollbar {
+  scrollbar-color: #b8beb9 transparent;
+  scrollbar-width: thin;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .result-enter {
+    animation: result-enter 360ms ease-out both;
+  }
+
+  @keyframes result-enter {
+    from {
+      opacity: 0;
+      transform: translateY(8px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+}
