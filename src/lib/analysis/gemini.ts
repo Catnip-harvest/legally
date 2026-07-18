@@ -1,4 +1,4 @@
-import { GoogleGenAI } from "@google/genai";
+import { GoogleGenAI, ThinkingLevel } from "@google/genai";
 import { buildAnalysisPrompt, SYSTEM_INSTRUCTION } from "./prompts";
 import {
   modelResponseJsonSchema,
@@ -28,8 +28,8 @@ export async function extractCandidatesWithGemini(
     contents: buildAnalysisPrompt(input),
     config: {
       systemInstruction: SYSTEM_INSTRUCTION,
-      temperature: 0.1,
-      maxOutputTokens: 6_000,
+      thinkingConfig: { thinkingLevel: ThinkingLevel.LOW },
+      maxOutputTokens: 12_000,
       responseMimeType: "application/json",
       responseJsonSchema: modelResponseJsonSchema,
       httpOptions: { timeout: REQUEST_TIMEOUT_MS },
@@ -44,11 +44,21 @@ export async function extractCandidatesWithGemini(
   try {
     parsed = JSON.parse(response.text);
   } catch {
+    console.error("[gemini-invalid-json]", {
+      textLength: response.text.length,
+      finishReason: response.candidates?.[0]?.finishReason ?? null,
+    });
     throw new Error("GEMINI_INVALID_JSON");
   }
 
   const validated = modelResponseSchema.safeParse(parsed);
   if (!validated.success) {
+    console.error("[gemini-schema-mismatch]", {
+      issues: validated.error.issues.slice(0, 8).map((issue) => ({
+        code: issue.code,
+        path: issue.path.join("."),
+      })),
+    });
     throw new Error("GEMINI_SCHEMA_MISMATCH");
   }
 
