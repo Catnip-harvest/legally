@@ -1,8 +1,10 @@
-# Legally handoff — local MiniLM embedding swap
+# Legally handoff - submission-ready build
 
 ## Status
 
 The feature-hash embedding has been replaced with local `Xenova/all-MiniLM-L6-v2` inference through `@huggingface/transformers` 4.2.0 and `onnxruntime-node` 1.24.3.
+
+Candidate extraction now uses the stable `gemini-3.5-flash` model. Gemini remains limited to structured evidence extraction; deterministic TypeScript owns classification, confidence, and review priority.
 
 Completed:
 
@@ -26,7 +28,7 @@ The extraction prompt/schema, Gemini integration, and UI were not changed as par
 - `pnpm lint`: passed
 - `pnpm build`: passed with Next.js 16.2.10
 - Production server startup logged successful MiniLM pre-warming.
-- Complete production UI analysis passed with **5 verified candidates**, **0 rejected quotations**, **2 Direct**, **1 Inferential**, and **2 False positives**.
+- Complete production UI analysis passed with **4 verified candidates**, **1 unsupported candidate excluded**, **2 Direct**, **1 Inferential**, and **1 False positive**.
 - The Inferential result filter was exercised and displayed only the expected sleep-timeline finding.
 
 ## Fixture similarity comparison
@@ -62,6 +64,6 @@ Open `http://localhost:3000`. The committed `.env.example` documents configurati
 
 ## Submission follow-up
 
-Record and upload the walkthrough using `docs/WALKTHROUGH.md`.
+Read `docs/APP_GUIDE.md`, then record and upload the walkthrough using `docs/WALKTHROUGH.md`.
 
 Do not retune `DIRECT_SIM_THRESHOLD` casually. It was deliberately preserved for this task and should be calibrated later using attorney-labeled deposition pairs.

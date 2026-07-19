@@ -64,7 +64,7 @@ The UI presents three distinct categories, review priority, verified quotes and 
 
 The automated suite has 31 tests covering the decision tree, confidence formula, pair-aware time normalization, ambiguous-meridiem certainty, hedge terms, entity overlap, predicate-aware polarity, date-scope guards, wrapped certified-line and unnumbered speaker-block quote verification, embedding-cache reuse, and the direct/inferential/false-positive MiniLM fixtures.
 
-The production UI was also exercised against the included synthetic Marcus Webb transcripts. Gemini returned five verified candidates: two direct contradictions, one inferential contradiction, and two false positives.
+The production UI was also exercised against the included synthetic Marcus Webb transcripts using Gemini 3.5 Flash. Gemini proposed five candidates: four had verified quotations and entered the review queue, while one unsupported candidate was excluded. The verified set contained two direct contradictions, one inferential contradiction, and one false positive.
 
 ## Known trade-offs
 

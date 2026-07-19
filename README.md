@@ -29,7 +29,7 @@ All thresholds and confidence weights live in `SCORING_CONFIG`. Confidence is a 
 
 ## Local semantic embeddings
 
-`semanticSimilarity` is computed by `Xenova/all-MiniLM-L6-v2` through `@huggingface/transformers`. The ONNX model runs locally in Node.js; scoring does not call an embedding API. On the first installation/run, the model files are downloaded once (about 88–90 MB) and stored under `.cache/transformers`. Subsequent inference uses that local cache.
+`semanticSimilarity` is computed by `Xenova/all-MiniLM-L6-v2` through `@huggingface/transformers`. The ONNX model runs locally in Node.js; scoring does not call an embedding API. On the first installation/run, the model files are downloaded once (about 88-90 MB) and stored under `.cache/transformers`. Subsequent inference uses that local cache.
 
 The feature-extraction pipeline is a module-level lazy singleton, pre-warmed when the Node server starts. Claim embeddings are cached in memory by a SHA-256 hash of their text, including in-flight work, so repeated candidate comparisons do not re-embed identical testimony.
 
@@ -97,6 +97,8 @@ This is a production-minded take-home MVP, not a production legal platform. Real
 
 `DIRECT_SIM_THRESHOLD` was intentionally not retuned during the MiniLM source swap. It should be calibrated with labeled deposition pairs before production use.
 
-## Walkthrough
+## Submission materials
 
-A recording outline and narration script are in [`docs/WALKTHROUGH.md`](docs/WALKTHROUGH.md).
+- [`docs/APP_GUIDE.md`](docs/APP_GUIDE.md) teaches the architecture, scoring policy, evidence safeguards, limitations, and common reviewer questions in plain English.
+- [`docs/WALKTHROUGH.md`](docs/WALKTHROUGH.md) is a timed screen-recording plan with a complete narration script and submission checklist.
+- [`ARCHITECTURE_NOTES.md`](ARCHITECTURE_NOTES.md) records the main technical decisions and trade-offs.
