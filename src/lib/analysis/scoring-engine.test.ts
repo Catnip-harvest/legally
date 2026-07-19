@@ -40,6 +40,9 @@ describe("scoreContradiction", () => {
     expect(SCORING_CONFIG.CONTRADICTION_MINUTES).toBeGreaterThan(
       SCORING_CONFIG.FALSE_POSITIVE_MINUTES,
     );
+    expect(SCORING_CONFIG.AMBIGUOUS_TIME_CERTAINTY_BONUS).toBeLessThan(
+      SCORING_CONFIG.TIME_CERTAINTY_BONUS,
+    );
   });
 
   it("classifies opposite polarity with similar claims as direct", async () => {
@@ -109,6 +112,7 @@ describe("scoreContradiction", () => {
 
     const result = await scoreContradiction(input);
     expect(result.features.polarityOpposite).toBe(false);
+    expect(result.features.hasParseableTimes).toBe(false);
     expect(result.type).toBe("FALSE_POSITIVE");
   });
 
@@ -197,6 +201,68 @@ describe("scoreContradiction", () => {
     expect(result.type).toBe("INFERENTIAL");
     expect(result.features.requiresInference).toBe(true);
     expect(result.features.timeDeltaMinutes).toBe(120);
+    expect(result.features.timeReferenceAmbiguous).toBe(false);
+    expect(result.features.timeCertaintyScore).toBe(1);
+  });
+
+  it("resolves an unlabeled clock against an explicit PM reference", async () => {
+    const input = pair({
+      topic: "Evening departure",
+      claimA: {
+        text: "I was home around 7 PM.",
+        timeRef: "around 7 PM",
+        entities: ["Marcus Webb", "November 3rd"],
+        embedding: [1, 0],
+      },
+      claimB: {
+        text: "I went out around 7:30.",
+        timeRef: "around 7:30",
+        entities: ["Marcus Webb", "November 3rd"],
+        embedding: [1, 0],
+      },
+    });
+
+    const result = await scoreContradiction(input);
+    expect(result.features.timeDeltaMinutes).toBe(30);
+    expect(result.features.timeReferenceAmbiguous).toBe(true);
+    expect(result.features.timeCertaintyScore).toBe(0.5);
+    expect(result.factors.find((factor) => factor.label === "Parseable time")).toMatchObject({
+      impact: 11,
+    });
+  });
+
+  it("uses the closest hedged bedtime estimate across midnight", async () => {
+    const input = pair({
+      topic: "Bedtime on November 3rd",
+      claimA: {
+        text: "Around 10, maybe 10:30.",
+        timeRef: "Around 10, maybe 10:30",
+        entities: ["Marcus Webb", "November 3rd", "Sleep"],
+        embedding: [1, 0],
+      },
+      claimB: {
+        text: "It was late. Midnight maybe.",
+        timeRef: "Midnight maybe",
+        entities: ["Marcus Webb", "November 3rd", "Sleep"],
+        embedding: [0.9, 0.1],
+      },
+    });
+
+    const result = await scoreContradiction(input);
+    expect(result.features.timeDeltaMinutes).toBe(90);
+    expect(result.features.timeReferenceAmbiguous).toBe(true);
+    expect(result.type).toBe("INFERENTIAL");
+  });
+
+  it("uses circular clock distance for explicit midnight rollover", async () => {
+    const input = pair({
+      claimA: { ...pair().claimA, timeRef: "11 PM" },
+      claimB: { ...pair().claimB, timeRef: "1 AM" },
+    });
+
+    const features = await extractScoringFeatures(input);
+    expect(features.timeDeltaMinutes).toBe(120);
+    expect(features.timeReferenceAmbiguous).toBe(false);
   });
 
   it("discards pairs below the entity-overlap threshold", async () => {
@@ -237,6 +303,8 @@ describe("scoreContradiction", () => {
       hedgeLanguageDetected: true,
       timeDeltaMinutes: 90,
       requiresInference: false,
+      timeReferenceAmbiguous: false,
+      timeCertaintyScore: 1,
     };
     const expected =
       SCORING_CONFIG.WEIGHTS.semanticSimilarity * 0.8 +
@@ -249,7 +317,18 @@ describe("scoreContradiction", () => {
   });
 
   it("detects all configured hedge forms without a model", async () => {
-    for (const text of ["around 8", "about 8", "roughly 8", "eight-ish", "maybe 8", "approximately 8", "8 or so"]) {
+    for (const text of [
+      "around 8",
+      "about 8",
+      "roughly 8",
+      "eight-ish",
+      "maybe 8",
+      "approximately 8",
+      "8 or so",
+      "I think it was 8",
+      "He might have seen me",
+      "Perhaps it was later",
+    ]) {
       const input = pair({ claimA: { ...pair().claimA, text } });
       expect((await extractScoringFeatures(input)).hedgeLanguageDetected).toBe(true);
     }
@@ -259,6 +338,7 @@ describe("scoreContradiction", () => {
     expect(normalizeTime("around 8")).toBe(480);
     expect(normalizeTime("8:05")).toBe(485);
     expect(normalizeTime("midnight")).toBe(0);
+    expect(normalizeTime("October 3rd")).toBeNull();
   });
 
   it("computes normalized entity-set overlap", () => {

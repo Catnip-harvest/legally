@@ -26,7 +26,7 @@ Open `src/lib/analysis/embeddings.ts` and `src/lib/analysis/scoring-engine.ts`.
 
 > Semantic similarity now comes from all-MiniLM-L6-v2 running locally through Transformers.js and ONNX. The roughly 90-megabyte model downloads once, is pre-warmed at server startup, and is reused through a module singleton. A SHA-256 keyed memory cache prevents duplicate claim embeddings.
 
-> The scoring engine is async because embedding is async, but classification remains a deterministic decision tree. Entity overlap gates unrelated claims. Hedged time differences inside 15 minutes become false positives. Opposite polarity plus similarity becomes direct. Incompatible times without direct polarity become inferential. Weak signals default to false positive.
+> The scoring engine is async because embedding is async, but classification remains a deterministic decision tree. Entity overlap gates unrelated claims. Pair-aware clock normalization handles midnight rollover and chooses the conservative distance when AM/PM is unresolved, while reducing the time-certainty bonus. Hedged time differences inside 15 minutes become false positives. Opposite polarity plus similarity becomes direct. Incompatible times without direct polarity become inferential. Weak signals default to false positive.
 
 > Confidence is the same code-owned weighted sum as before. The MiniLM change did not alter any weight or threshold, and no LLM confidence is read anywhere.
 
@@ -47,7 +47,7 @@ pnpm lint
 pnpm build
 ```
 
-> The 28-test suite includes real local-MiniLM fixtures for all three classes plus wrapped certified-line, unnumbered speaker-block, predicate-negation, and date-scope regressions. Their expected classifications did not change. Compared with feature hashing, MiniLM recognizes the semantic relationship in the sleep timeline much more strongly, while the policy signals still determine the legal-review bucket.
+> The 31-test suite includes real local-MiniLM fixtures for all three classes plus pair-aware clock, wrapped certified-line, unnumbered speaker-block, predicate-negation, and date-scope regressions. Their expected classifications did not change. Compared with feature hashing, MiniLM recognizes the semantic relationship in the sleep timeline much more strongly, while the policy signals still determine the legal-review bucket.
 
 Show the measured fixture values from the submission notes.
 

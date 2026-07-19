@@ -22,7 +22,7 @@ Gemini returns verbatim quote pairs, time references, normalized entities, a pos
 - Entity-set overlap gates unrelated pairs.
 - Small hedged time differences become false positives.
 - Opposite polarity plus semantic similarity becomes direct.
-- Incompatible time claims without direct polarity become inferential.
+- Incompatible time claims without direct polarity become inferential; pair-aware clock normalization handles midnight rollover and discounts unresolved AM/PM.
 - Weak or ambiguous signals default to false positive.
 
 All thresholds and confidence weights live in `SCORING_CONFIG`. Confidence is a clamped weighted sum of semantic similarity, entity overlap, polarity, parseable time, and hedge language. No model-provided confidence field exists in this path.
@@ -44,7 +44,7 @@ The feature-extraction pipeline is a module-level lazy singleton, pre-warmed whe
 - Exact source quotation verification with one-based line references.
 - Input limits, provider timeouts, safe errors, and `no-store` responses.
 - Responsive desktop and mobile layouts.
-- 28 automated tests, including real MiniLM, wrapped certified-line and unnumbered speaker-block verification, predicate-negation, and date-scope benchmark regressions.
+- 31 automated tests, including real MiniLM, wrapped certified-line and unnumbered speaker-block verification, pair-aware clock normalization, predicate-negation, and date-scope benchmark regressions.
 
 ## Run locally
 

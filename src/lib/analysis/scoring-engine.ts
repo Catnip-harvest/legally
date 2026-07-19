@@ -14,6 +14,7 @@ export const SCORING_CONFIG = Object.freeze({
   DIRECT_SIM_THRESHOLD: 0.05,
   CONTRADICTION_MINUTES: 45,
   TIME_CERTAINTY_BONUS: 1,
+  AMBIGUOUS_TIME_CERTAINTY_BONUS: 0.5,
   WEIGHTS: Object.freeze({
     semanticSimilarity: 0.35,
     entityOverlap: 0.25,
@@ -47,6 +48,8 @@ export type ScoringFeatures = {
   polarityOpposite: boolean;
   requiresInference: boolean;
   hasParseableTimes: boolean;
+  timeReferenceAmbiguous: boolean;
+  timeCertaintyScore: number;
 };
 
 export type ScoredContradiction = {
@@ -60,7 +63,7 @@ export type ScoredContradiction = {
 
 const FIXED_TIME_REFERENCE = new Date(2000, 0, 1, 12, 0, 0, 0);
 const HEDGE_PATTERN =
-  /(?:\b(?:about|approximately|around|maybe|or so|roughly)\b|\b\w+-ish\b)/i;
+  /(?:\b(?:about|approximately|around|close to|i believe|i guess|i think|maybe|might|not sure|or so|perhaps|possibly|roughly|want to say)\b|\b(?:do not|don't) (?:recall|remember)\b|\b\w+-ish\b)/i;
 const NEGATION_PATTERN =
   /\b(?:cannot|can't|did not|didn't|does not|doesn't|never|no|no one|nobody|none|nothing|not|was not|wasn't|were not|weren't|without)\b/i;
 const UNIVERSAL_LOCATION_PATTERN =
@@ -232,37 +235,78 @@ export function entityOverlap(entitiesA: string[], entitiesB: string[]) {
   return intersection / union.size;
 }
 
-function manualClockMinutes(reference: string) {
-  const normalized = reference.toLowerCase().trim();
-  if (/\bmidnight\b/.test(normalized)) return 0;
-  if (/\bnoon\b/.test(normalized)) return 12 * 60;
+type ParsedClockReference = {
+  options: number[];
+  ambiguous: boolean;
+};
 
-  const match = normalized.match(/\b(\d{1,2})(?::(\d{2}))?\s*(a\.?m\.?|p\.?m\.?)?\b/i);
-  if (!match) return null;
-  let hour = Number(match[1]);
-  const minute = Number(match[2] ?? 0);
-  const meridiem = match[3]?.replaceAll(".", "").toLowerCase();
-  if (hour > 23 || minute > 59) return null;
-  if (meridiem === "pm" && hour < 12) hour += 12;
-  if (meridiem === "am" && hour === 12) hour = 0;
-  return hour * 60 + minute;
+function parseClockReference(reference: string | null): ParsedClockReference | null {
+  if (!reference) return null;
+  const normalized = reference.toLowerCase().trim();
+  const options: number[] = [];
+  let ambiguous = false;
+
+  if (/\bmidnight\b/.test(normalized)) options.push(0);
+  if (/\bnoon\b/.test(normalized)) options.push(12 * 60);
+
+  const pattern = /\b(\d{1,2})(?::(\d{2}))?\s*(a\.?m\.?|p\.?m\.?)?\b/gi;
+  let match: RegExpExecArray | null;
+  while ((match = pattern.exec(normalized)) !== null) {
+    let hour = Number(match[1]);
+    const minute = Number(match[2] ?? 0);
+    const meridiem = match[3]?.replaceAll(".", "").toLowerCase();
+    if (hour > 23 || minute > 59 || (meridiem && hour > 12)) continue;
+
+    if (meridiem) {
+      if (meridiem === "pm" && hour < 12) hour += 12;
+      if (meridiem === "am" && hour === 12) hour = 0;
+      options.push(hour * 60 + minute);
+    } else if (hour === 0 || hour > 12) {
+      options.push(hour * 60 + minute);
+    } else {
+      const base = (hour % 12) * 60 + minute;
+      options.push(base, base + 12 * 60);
+      ambiguous = true;
+    }
+  }
+
+  const uniqueOptions = [...new Set(options)];
+  if (uniqueOptions.length) {
+    return {
+      options: uniqueOptions,
+      ambiguous: ambiguous || uniqueOptions.length > 1,
+    };
+  }
+
+  if (!/\b(?:a\.?m\.?|p\.?m\.?|o'?clock|morning|afternoon|evening|night)\b/i.test(normalized)) {
+    return null;
+  }
+  const parsed = parseDate(reference, FIXED_TIME_REFERENCE, { forwardDate: false });
+  return parsed
+    ? { options: [parsed.getHours() * 60 + parsed.getMinutes()], ambiguous: false }
+    : null;
 }
 
 export function normalizeTime(reference: string | null) {
-  if (!reference) return null;
-  const manual = manualClockMinutes(reference);
-  if (manual !== null) return manual;
-
-  const parsed = parseDate(reference, FIXED_TIME_REFERENCE, { forwardDate: false });
-  return parsed ? parsed.getHours() * 60 + parsed.getMinutes() : null;
+  return parseClockReference(reference)?.options[0] ?? null;
 }
 
 function timeDelta(referenceA: string | null, referenceB: string | null) {
-  const timeA = normalizeTime(referenceA);
-  const timeB = normalizeTime(referenceB);
-  if (timeA === null || timeB === null) return null;
-  const absolute = Math.abs(timeA - timeB);
-  return Math.min(absolute, 24 * 60 - absolute);
+  const timeA = parseClockReference(referenceA);
+  const timeB = parseClockReference(referenceB);
+  if (!timeA || !timeB) return null;
+
+  let minutes = Number.POSITIVE_INFINITY;
+  for (const optionA of timeA.options) {
+    for (const optionB of timeB.options) {
+      const absolute = Math.abs(optionA - optionB);
+      minutes = Math.min(minutes, absolute, 24 * 60 - absolute);
+    }
+  }
+  return {
+    minutes,
+    ambiguous: timeA.ambiguous || timeB.ambiguous,
+  };
 }
 
 function tokenOverlap(textA: string, textB: string) {
@@ -306,7 +350,8 @@ export async function extractScoringFeatures(
       : embedText(pair.claimB.text),
   ]);
   const semanticSimilarity = await cosineSimilarity(embeddingA, embeddingB);
-  const timeDeltaMinutes = timeDelta(pair.claimA.timeRef, pair.claimB.timeRef);
+  const timing = timeDelta(pair.claimA.timeRef, pair.claimB.timeRef);
+  const timeDeltaMinutes = timing?.minutes ?? null;
   const polarity = polarityOpposite(pair);
 
   return {
@@ -321,6 +366,13 @@ export async function extractScoringFeatures(
       timeDeltaMinutes > SCORING_CONFIG.CONTRADICTION_MINUTES &&
       !polarity,
     hasParseableTimes: timeDeltaMinutes !== null,
+    timeReferenceAmbiguous: timing?.ambiguous ?? false,
+    timeCertaintyScore:
+      timing === null
+        ? 0
+        : timing.ambiguous
+          ? SCORING_CONFIG.AMBIGUOUS_TIME_CERTAINTY_BONUS
+          : SCORING_CONFIG.TIME_CERTAINTY_BONUS,
   };
 }
 
@@ -331,8 +383,7 @@ export function calculateConfidence(features: ScoringFeatures) {
     weights.semanticSimilarity * features.semanticSimilarity +
       weights.entityOverlap * features.entityOverlapScore +
       weights.polarityOpposite * (features.polarityOpposite ? 1 : 0) +
-      weights.parseableTimes *
-        (features.hasParseableTimes ? SCORING_CONFIG.TIME_CERTAINTY_BONUS : 0) -
+      weights.parseableTimes * features.timeCertaintyScore -
       weights.hedgePenalty * (features.hedgeLanguageDetected ? 1 : 0),
   );
 }
@@ -360,10 +411,12 @@ function confidenceFactors(features: ScoringFeatures): ConfidenceFactor[] {
     {
       label: "Parseable time",
       detail: features.hasParseableTimes
-        ? `Both time references parsed; delta ${features.timeDeltaMinutes} minutes.`
+        ? features.timeReferenceAmbiguous
+          ? `Clock times parsed with unresolved AM/PM or multiple estimates; conservative delta ${features.timeDeltaMinutes} minutes.`
+          : `Both time references parsed; delta ${features.timeDeltaMinutes} minutes.`
         : "Both claims did not provide parseable time references.",
       impact: features.hasParseableTimes
-        ? Math.round(weights.parseableTimes * SCORING_CONFIG.TIME_CERTAINTY_BONUS * 100)
+        ? Math.round(weights.parseableTimes * features.timeCertaintyScore * 100)
         : 0,
     },
     {
