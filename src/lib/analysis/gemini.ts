@@ -17,7 +17,7 @@ export async function extractCandidatesWithGemini(
     throw new Error("GEMINI_API_KEY_MISSING");
   }
 
-  const model = process.env.GEMINI_MODEL || "gemini-3-flash-preview";
+  const model = process.env.GEMINI_MODEL || "gemini-3.5-flash";
   const ai = new GoogleGenAI({
     apiKey,
     httpOptions: { timeout: REQUEST_TIMEOUT_MS },
